@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Interactive Weather App</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-image: url('https://islandwatersportshawaii.com/wp-content/uploads/2024/01/hawaii-beach.jpg'); /* Default background */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            min-height: 100vh; /* Ensure full viewport height */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.5s ease-in-out;
+            
+        }
+
+        .weather-container {
+            background-color: rgba(255, 255, 255, 0.6); /* Slightly less transparent for better readability */
+            padding: 30px 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            max-width: 400px;
+            transform-style: preserve-3d;
+            transition: transform 1s;
+        }
+
+        .flipped {
+            transform: rotateY(360deg);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #2E7D32; /* A darker shade of green */
+        }
+
+        .temp {
+            font-size: 18px;
+            margin: 8px 0;
+            color: #333; /* Darker text for better contrast */
+        }
+
+        .label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        #cityInput {
+            padding: 10px;
+            width: 80%;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+
+        #getWeatherBtn {
+            padding: 10px 20px;
+            background-color: #43A047; /* A brighter shade of green */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        #getWeatherBtn:hover {
+            background-color: #2E7D32;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="weather-container" id="weatherCard">
+        <h1>🌦 Weather App</h1>
+        <input type="text" id="cityInput" placeholder="Enter city name" />
+        <br />
+        <button id="getWeatherBtn">Get Weather</button>
+
+        <div class="temp"><span class="label">City:</span> <span id="location">--</span></div>
+        <div class="temp"><span class="label">Kelvin:</span> <span id="kelvin">--</span> K</div>
+        <div class="temp"><span class="label">Celsius:</span> <span id="celsius">--</span> °C</div>
+        <div class="temp"><span class="label">Fahrenheit:</span> <span id="fahrenheit">--</span> °F</div>
+        <div class="temp"><span class="label">Humidity:</span> <span id="humidity">--</span> %</div>
+        <div class="temp"><span class="label">AQI:</span> <span id="aqi">--</span></div>
+    </div>
+
+    <script>
+        const apiKey = '4cd487bad3dd37c04dfbbe9cd93f18e7'; // Your actual API key
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const getWeatherBtn = document.getElementById('getWeatherBtn');
+            const cityInput = document.getElementById('cityInput');
+            const weatherCard = document.getElementById('weatherCard');
+            const locationElement = document.getElementById('location');
+            const kelvinElement = document.getElementById('kelvin');
+            const celsiusElement = document.getElementById('celsius');
+            const fahrenheitElement = document.getElementById('fahrenheit');
+            const humidityElement = document.getElementById('humidity');
+            const aqiElement = document.getElementById('aqi');
+            const bodyElement = document.body;
+
+            getWeatherBtn.addEventListener('click', () => {
+                const city = cityInput.value.trim();
+
+                if (city.length < 2) {
+                    alert('Please enter a valid city name.');
+                    return;
+                }
+
+                // Clear any previous background set by JavaScript
+                bodyElement.style.backgroundImage = '';
+
+                // Fetch coordinates for the city
+                fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city)}&limit=1&appid=${apiKey}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(geoData => {
+                        if (!geoData || geoData.length === 0) {
+                            throw new Error('City not found');
+                        }
+
+                        const { lat, lon, name } = geoData[0];
+
+                        // Fetch weather data
+                        return fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                const kelvin = data.main.temp;
+                                const celsius = kelvin - 273.15;
+                                const fahrenheit = (celsius * 9/5) + 32;
+                                const humidity = data.main.humidity;
+                                const weatherCondition = data.weather[0].main;
+
+                                locationElement.textContent = name;
+                                kelvinElement.textContent = kelvin.toFixed(2);
+                                celsiusElement.textContent = celsius.toFixed(2);
+                                fahrenheitElement.textContent = fahrenheit.toFixed(2);
+                                humidityElement.textContent = humidity;
+
+                                setBackground(weatherCondition);
+                                weatherCard.classList.add('flipped');
+
+                                // Fetch AQI (Air Quality Index)
+                                return fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`)
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            console.warn('Failed to fetch AQI data.');
+                                            aqiElement.textContent = 'N/A';
+                                            return null; // Don't throw an error, AQI is optional
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(aqiData => {
+                                        if (aqiData && aqiData.list && aqiData.list.length > 0) {
+                                            const aqiIndex = aqiData.list[0].main.aqi;
+                                            const aqiDescription = getAQIDescription(aqiIndex);
+                                            aqiElement.textContent = `${aqiIndex} (${aqiDescription})`;
+                                        } else {
+                                            aqiElement.textContent = 'N/A';
+                                        }
+                                    });
+                            });
+                    })
+                    .catch(err => {
+                        alert('Error: ' + err.message);
+                        console.error(err);
+                        // Optionally reset the background to the default or a neutral one
+                        bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1465744113633-e0d0405e69cd?auto=format&fit=crop&w=1600&q=80')";
+                        locationElement.textContent = '--';
+                        kelvinElement.textContent = '--';
+                        celsiusElement.textContent = '--';
+                        fahrenheitElement.textContent = '--';
+                        humidityElement.textContent = '--';
+                        aqiElement.textContent = '--';
+                        weatherCard.classList.remove('flipped'); // Ensure card isn't stuck in flipped state
+                    });
+            });
+
+            // Function to describe the AQI level
+            function getAQIDescription(index) {
+                switch(index) {
+                    case 1: return 'Good';
+                    case 2: return 'Fair';
+                    case 3: return 'Moderate';
+                    case 4: return 'Poor';
+                    case 5: return 'Very Poor';
+                    default: return 'Unknown';
+                }
+            }
+
+            // Function to change the background based on weather condition
+            function setBackground(condition) {
+                const lower = condition.toLowerCase();
+                if (lower.includes('cloud')) {
+                    bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1600&q=80')";
+                } else if (lower.includes('clear') || lower.includes('sun')) {
+                    bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1501973801540-537f08ccae7b?auto=format&fit=crop&w=1600&q=80')";
+                } else if (lower.includes('rain')) {
+                    bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1526676033245-4b1ea31c83a2?auto=format&fit=crop&w=1600&q=80')";
+                } else if (lower.includes('snow')) {
+                    bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1608889174114-73c1e76cfd9c?auto=format&fit=crop&w=1600&q=80')";
+                } else if (lower.includes('mist') || lower.includes('fog')) {
+                    bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1504466757778-e5c8c6d6ca79?auto=format&fit=crop&w=1600&q=80')";
+                } else {
+                    bodyElement.style.backgroundImage = "url('https://images.unsplash.com/photo-1499346030926-9a72daac6c63?auto=format&fit=crop&w=1600&q=80')"; // Default if no match
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>
